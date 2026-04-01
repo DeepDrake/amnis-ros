@@ -131,30 +131,30 @@ class BrakeControllerNode(Node):
             )
     
     def brake_command_callback(self, msg: BrakeCommand) -> None:
-        """Handle incoming brake commands.
-        
-        Args:
-            msg: BrakeCommand message with brake value [0, 1]
-        """
-        self._last_command = msg
-        self._last_command_time = self.get_clock().now()
-        self._is_timed_out = False
-        
-        # Process brake command immediately
-        brake = msg.brake
-        
-        # Apply deadzone
-        if abs(brake) < self.deadzone:
-            brake = 0.0
-        
-        # Clamp to valid range [0.0, 1.0]
-        brake = max(0.0, min(1.0, brake))
-        
-        # Send to hardware
-        success = self.driver.set_pressure(brake)
-        
-        if success:
-            self._current_pressure = brake
+            """Handle incoming brake commands.
+            Args:
+                msg: BrakeCommand message with brake value [0, 1]
+            """
+            self._last_command = msg
+            self._last_command_time = self.get_clock().now()
+            self._is_timed_out = False
+            # Instant message processing
+            brake = msg.brake
+            # --- UPDATE ---
+            # Only send CAN commands if brake value is above the deadzone threshold.
+            if brake > self.deadzone:
+                # Clamp the value safely between 0.0 and 1.0
+                brake = max(0.0, min(1.0, brake))
+                # Send the pressure command to the CAN bus
+                success = self.driver.set_pressure(brake)
+                if success:
+                    self._current_pressure = brake
+            else:
+                # If the value is below the deadzone (0.01): DO NOT SEND ANYTHING
+                # This stops the CAN message stream from the Jetson.
+                # The EHB-unit recognizes this as a 'timeout' and gives the pedal
+                # full control over the rear axle.
+                self._current_pressure = 0.0
     
     def update_callback(self) -> None:
         """Periodic update for status monitoring and diagnostics.
