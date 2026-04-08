@@ -72,12 +72,12 @@ def generate_launch_description():
             'output_limit': 1.0,            # Max output
             'max_integral_time_sec': 2.0,   # Max integral accumulation time
             # Pot meter mapping (configure based on physical setup)
-            'pot_min': 0.0,         # Pot value at full left
-            'pot_center': 0.5,      # Pot value at center (adjust after calibration)
-            'pot_max': 1.0,         # Pot value at full right
+            'pot_min': 0.2,         # Pot value at full left
+            'pot_center': 0.35,      # Pot value at center (adjust after calibration)
+            'pot_max': 0.5,         # Pot value at full right
             'pot_deadzone': 0.02,   # Deadzone around center
             # Control parameters
-            'enable_pid': False,    # **SET TO TRUE WHEN POT METER IS FIXED**
+            'enable_pid': True,    # **SET TO TRUE WHEN POT METER IS FIXED**
             'update_rate_hz': 10.0, # Match sensor_reader rate
             'feedback_timeout_sec': 0.5,
             'derivative_filter_alpha': 0.1,  # Derivative noise filtering
