@@ -76,16 +76,16 @@ class PIDSteerControllerNode(Node):
         # pot_center: Pot meter value when steering is centered (typically 0.5)
         # pot_min: Pot meter value at full left steering (maps to -1.0)
         # pot_max: Pot meter value at full right steering (maps to +1.0)
-        self.declare_parameter('pot_min', 0.0)      # Full left position
-        self.declare_parameter('pot_center', 0.5)   # Center position
-        self.declare_parameter('pot_max', 1.0)      # Full right position
+        self.declare_parameter('pot_min', 0.2)      # Full left position
+        self.declare_parameter('pot_center', 0.35)   # Center position
+        self.declare_parameter('pot_max', 0.5)      # Full right position
         
         # Deadzone around center to prevent jitter when centered
         self.declare_parameter('pot_deadzone', 0.02)
         
         # ==================== Control Parameters ====================
         # Enable/disable PID control (false = passthrough mode)
-        self.declare_parameter('enable_pid', False)
+        self.declare_parameter('enable_pid', True)
         
         # Update rate in Hz (matches sensor_reader rate for consistency)
         self.declare_parameter('update_rate_hz', 10.0)
