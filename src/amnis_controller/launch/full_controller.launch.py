@@ -46,7 +46,7 @@ def generate_launch_description():
             'trigger_axes': [2],
             'deadzone': 0.05,
             'log_throttle_sec': 0.5,
-            'verbose': False,  # Logging disabled
+            'verbose': True,  # Logging enabled
         }]
     )
     
@@ -120,7 +120,7 @@ def generate_launch_description():
             'gas_override_raw_max': 1500,   # Trigger if raw ADC < 1500
             'verbose_override': True,       # Log override events
             'log_throttle_sec': 0.5,
-            'verbose': False,  # Logging disabled
+            'verbose': True,  # Logging enabled
         }]
     )
     
@@ -146,7 +146,7 @@ def generate_launch_description():
             'steer_to_power_scale': 100.0,
             'publish_diagnostics': True,
             'log_throttle_sec': 1.0,
-            'verbose': False,  # Logging disabled
+            'verbose': True,  # Logging enabled
         }]
     )
     
