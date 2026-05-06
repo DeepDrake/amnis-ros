@@ -175,7 +175,7 @@ class PIDSteerControllerNode(Node):
         self._last_feedback_time: Optional[float] = None
         
         # Pot meter calibration status from SensorData
-        self._pot_calibrated: bool = False
+        self._pot_calibrated: bool = True
         
         # Track if we're in passthrough mode and why
         self._passthrough_reason: Optional[str] = None
