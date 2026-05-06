@@ -95,7 +95,7 @@ def generate_launch_description():
     # Receives PID-corrected commands from pid_steer_controller_node
     controller_node = Node(
         package='amnis_controller',
-        executable='steering_vehicle_controller_node',
+        executable='vehicle_controller_node',
         name='vehicle_controller',
         output='screen',
         parameters=[{
