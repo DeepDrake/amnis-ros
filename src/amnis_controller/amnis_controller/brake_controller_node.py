@@ -14,21 +14,14 @@ import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
 from std_msgs.msg import String
-from amnis_controller.msg import BrakeCommand
 
+# AANGEPAST: Importeer ook VehicleState voor de 'Heartbeat' fix
+from amnis_controller.msg import BrakeCommand, VehicleState
 from amnis_controller.drivers import EHBDriver
 
 
 class BrakeControllerNode(Node):
-    """ROS2 node for brake control via EHB system over CAN bus.
-    
-    This node:
-    - Subscribes to /brake_command topic
-    - Validates and limits brake commands
-    - Controls EHB system via CAN bus
-    - Publishes diagnostics
-    - Implements safety watchdog (releases brake if no command received)
-    """
+    """ROS2 node for brake control via EHB system over CAN bus."""
 
     def __init__(self) -> None:
         """Initialize the brake controller node."""
@@ -37,6 +30,7 @@ class BrakeControllerNode(Node):
         # Declare parameters
         self.declare_parameter('input_topic', 'brake_command')
         self.declare_parameter('diagnostic_topic', 'brake_diagnostics')
+        self.declare_parameter('vehicle_state_topic', 'vehicle_state') # NIEUW
         
         # Hardware configuration
         self.declare_parameter('can_channel', 'can2')
@@ -59,6 +53,7 @@ class BrakeControllerNode(Node):
         # Get parameter values
         input_topic = self.get_parameter('input_topic').value
         diagnostic_topic = self.get_parameter('diagnostic_topic').value
+        vehicle_state_topic = self.get_parameter('vehicle_state_topic').value # NIEUW
         can_channel = self.get_parameter('can_channel').value
         can_interface = self.get_parameter('can_interface').value
         pressure_scale = self.get_parameter('pressure_scale').value
@@ -88,12 +83,21 @@ class BrakeControllerNode(Node):
         self._last_command_time: Time | None = None
         self._current_pressure = 0.0
         self._is_timed_out = False
+        self._current_mode = None # NIEUW: Houdt bij in welke stand we rijden
         
-        # Create subscriber
+        # Create subscriber for brake commands
         self.subscription = self.create_subscription(
             BrakeCommand,
             input_topic,
             self.brake_command_callback,
+            10
+        )
+        
+        # NIEUW: Create subscriber voor de state machine (om EHB override te sturen)
+        self.state_subscription = self.create_subscription(
+            VehicleState,
+            vehicle_state_topic,
+            self.vehicle_state_callback,
             10
         )
         
@@ -130,38 +134,47 @@ class BrakeControllerNode(Node):
                 f"mock={mock_mode}"
             )
     
-    def brake_command_callback(self, msg: BrakeCommand) -> None:
-            """Handle incoming brake commands.
-            Args:
-                msg: BrakeCommand message with brake value [0, 1]
-            """
-            self._last_command = msg
-            self._last_command_time = self.get_clock().now()
-            self._is_timed_out = False
-            # Instant message processing
-            brake = msg.brake
-            # --- UPDATE ---
-            # Only send CAN commands if brake value is above the deadzone threshold.
-            if brake > self.deadzone:
-                # Clamp the value safely between 0.0 and 1.0
-                brake = max(0.0, min(1.0, brake))
-                # Send the pressure command to the CAN bus
-                success = self.driver.set_pressure(brake)
-                if success:
-                    self._current_pressure = brake
+    # NIEUW: Functie om de state op te vangen en naar de driver te sturen
+    def vehicle_state_callback(self, msg: VehicleState) -> None:
+        """Pas het gedrag van de EHB driver aan op basis van de state."""
+        if msg.state != self._current_mode:
+            self._current_mode = msg.state
+            
+            if msg.state == 'EXTERNAL':
+                # Autonoom = Jetson bestuurt, ECU negeert pedaal
+                self.driver.set_autonomous_mode(True)
+                if self.verbose:
+                    self.get_logger().info("EXTERNAL mode: EHB CAN override ingeschakeld (controller actief)")
             else:
-                # If the value is below the deadzone (0.01): DO NOT SEND ANYTHING
-                # This stops the CAN message stream from the Jetson.
-                # The EHB-unit recognizes this as a 'timeout' and gives the pedal
-                # full control over the rear axle.
-                self._current_pressure = 0.0
+                # MANUAL / IMMOBILIZED / EHB_ERROR = ECU leest fysiek pedaal uit
+                self.driver.set_autonomous_mode(False)
+                if self.verbose:
+                    self.get_logger().info(f"{msg.state} mode: EHB CAN override uitgeschakeld (pedaal actief)")
+    
+    def brake_command_callback(self, msg: BrakeCommand) -> None:
+        """Handle incoming brake commands."""
+        self._last_command = msg
+        self._last_command_time = self.get_clock().now()
+        self._is_timed_out = False
+        
+        # Process brake command immediately
+        brake = msg.brake
+        
+        # Apply deadzone
+        if abs(brake) < self.deadzone:
+            brake = 0.0
+        
+        # Clamp to valid range [0.0, 1.0]
+        brake = max(0.0, min(1.0, brake))
+        
+        # Send to hardware
+        success = self.driver.set_pressure(brake)
+        
+        if success:
+            self._current_pressure = brake
     
     def update_callback(self) -> None:
-        """Periodic update for status monitoring and diagnostics.
-        
-        This runs at a lower rate than the CAN transmission (which runs
-        at 50Hz internally in the driver).
-        """
+        """Periodic update for status monitoring and diagnostics."""
         # Check if we have a command
         if self._last_command is None:
             return
@@ -218,11 +231,7 @@ class BrakeControllerNode(Node):
             self._current_pressure = 0.0
     
     def _publish_diagnostics(self, pressure: float) -> None:
-        """Publish diagnostic information.
-        
-        Args:
-            pressure: Current brake pressure [0.0, 1.0]
-        """
+        """Publish diagnostic information."""
         msg = String()
         time_since_msg = self.driver.get_time_since_last_message()
         
@@ -232,8 +241,10 @@ class BrakeControllerNode(Node):
         else:
             time_str = "None"
         
+        # AANGEPAST: Voeg de huidige mode en override info toe aan de diagnostiek
         msg.data = (
             f"brake_pressure={pressure:.3f}, "
+            f"mode={self._current_mode}, "
             f"can_ok={self.driver.has_can_communication()}, "
             f"time_since_last_msg={time_str}, "
             f"timed_out={self._is_timed_out}"
@@ -241,10 +252,7 @@ class BrakeControllerNode(Node):
         self.diagnostic_pub.publish(msg)
     
     def destroy_node(self) -> bool:
-        """Cleanup when node is destroyed.
-        
-        Ensures brake is released and CAN communication is properly stopped.
-        """
+        """Cleanup when node is destroyed."""
         if self.verbose:
             self.get_logger().info("Shutting down brake controller...")
         
@@ -259,39 +267,16 @@ class BrakeControllerNode(Node):
 
 
 def main(args: Sequence[str] | None = None) -> None:
-    """Entry point for the node when run as a standalone executable.
-    
-    This function is called when you run:
-        ros2 run amnis_controller brake_controller_node
-    
-    It:
-    1. Initializes ROS 2 (rclpy.init)
-    2. Creates an instance of our node
-    3. Spins the node (runs the main loop that processes callbacks)
-    4. Cleans up when interrupted
-    
-    Args:
-        args: Command line arguments (passed to rclpy.init)
-    """
-    # Initialize ROS 2 Python client library
+    """Entry point for the node when run as a standalone executable."""
     rclpy.init(args=args)
-    
-    # Create node instance
     node = BrakeControllerNode()
     
     try:
-        # Spin keeps the node running and processing callbacks
-        # It will block here until Ctrl+C or rclpy.shutdown()
         rclpy.spin(node)
     except KeyboardInterrupt:
-        # User pressed Ctrl+C - always log this
         node.get_logger().info("Keyboard interrupt, shutting down...")
     finally:
-        # Always clean up
         node.destroy_node()
-        
-        # Only shutdown if rclpy is still initialized
-        # (prevents error if shutdown was called elsewhere)
         try:
             rclpy.shutdown()
         except Exception:
@@ -300,4 +285,3 @@ def main(args: Sequence[str] | None = None) -> None:
 
 if __name__ == '__main__':
     main()
-

@@ -77,6 +77,9 @@ class EHBDriver:
         self._switch_bit1 = 0
         self._switch_bit2 = 1
         
+        # NIEUW: Houd bij of we autonoom mogen remmen (standaard False voor veiligheid)
+        self._autonomous_enabled = False
+        
         # CAN message tracking - simplified approach
         self._last_can_message_time: Optional[float] = None
         self._can_timeout_sec = 0.5  # Error if no message received for 0.5 seconds
@@ -95,6 +98,14 @@ class EHBDriver:
         # Start transmission and reception threads if connected
         if self._connected or self.mock_mode:
             self._start_threads()
+    
+    # NIEUW: Functie om autonome modus (TESTMODE en DYNAMIC flags) te schakelen
+    def set_autonomous_mode(self, enabled: bool) -> None:
+        """Enable or disable autonomous control flags for the EHB."""
+        with self._lock:
+            self._autonomous_enabled = enabled
+            if not enabled:
+                self._last_pressure = 0.0  # Reset pressure direct naar 0 voor veiligheid
     
     def _initialize_can(self) -> bool:
         """Initialize CAN bus connection.
@@ -246,77 +257,60 @@ class EHBDriver:
         except Exception as e:
             self.logger.error(f"Failed to send CAN messages: {e}")
     
+    # AANGEPAST: Bouw alleen test/override flags op als autonomous mode aan staat
     def _build_message_150(self, pressure: float, bit1: int, bit2: int) -> bytearray:
-        """Build CAN message 0x150 (pressure command).
-        
-        This message contains pressure commands for all four wheels and
-        dynamic control flags.
-        
-        Args:
-            pressure: Brake pressure in bar (0.0 - 100.0)
-            bit1: Switch bit 1 (toggles between 0 and 1)
-            bit2: Switch bit 2 (toggles opposite to bit1)
-        
-        Returns:
-            8-byte CAN message data
-        """
-        # Scale pressure
-        pressure_front = int(self.pressure_scale * pressure)
-        pressure_rear = int(self.pressure_scale * pressure)
-        
-        # Convert to pressure value for CAN (14-bit value)
-        pressure_val = int(pressure_front / self.PRESSURE_RESOLUTION)
-        
-        # Initialize message data
+        """Build CAN message 0x150 (pressure command)."""
+        # Initialize message data (alles standaard op 0)
         msg_data = bytearray(8)
         
-        # Pack data into message (bit-packing from original implementation)
-        # Byte 7: Rear right pressure (low byte)
-        msg_data[7] = pressure_val & 0xFF
+        # De toggle bits MOGEN we NOOIT uitzetten (heartbeat voor de Bosch ECU)
+        msg_data[6] = (bit1 & 0x01) << 6
+        msg_data[4] = (bit2 & 0x01) << 6
         
-        # Byte 6: Rear right pressure (high 6 bits) + bit flags
-        msg_data[6] = ((pressure_val & 0x3F00) >> 8)
-        msg_data[6] |= (bit1 & 0x01) << 6
-        msg_data[6] |= 1 << 7  # DYNAMIC_HR = 1
-        
-        # Byte 5: Rear left pressure (low byte)
-        msg_data[5] = pressure_val & 0xFF
-        
-        # Byte 4: Rear left pressure (high 6 bits) + bit flags
-        msg_data[4] = ((pressure_val & 0x3F00) >> 8)
-        msg_data[4] |= (bit2 & 0x01) << 6
-        msg_data[4] |= 1 << 7  # DYNAMIC_HL = 1
-        
-        # Byte 3: Front right pressure (low byte)
-        msg_data[3] = pressure_val & 0xFF
-        
-        # Byte 2: Front right pressure (high 6 bits) + flags
-        msg_data[2] = ((pressure_val & 0x3F00) >> 8)
-        msg_data[2] |= 1 << 6  # TESTMODE_HY = 1
-        msg_data[2] |= 1 << 7  # DYNAMIC_VR = 1
-        
-        # Byte 1: Front left pressure (low byte)
-        msg_data[1] = pressure_val & 0xFF
-        
-        # Byte 0: Front left pressure (high 6 bits) + flags
-        msg_data[0] = ((pressure_val & 0x3F00) >> 8)
-        msg_data[0] |= 1 << 6  # TESTMODE_RO = 1
-        msg_data[0] |= 1 << 7  # DYNAMIC_VL = 1
-        
+        # Alleen test-flags en drukwaarden vullen als we in autonome besturing zitten
+        if self._autonomous_enabled:
+            # Scale pressure
+            pressure_front = int(self.pressure_scale * pressure)
+            pressure_rear = int(self.pressure_scale * pressure)
+            
+            # Convert to pressure value for CAN (14-bit value)
+            pressure_val = int(pressure_front / self.PRESSURE_RESOLUTION)
+            
+            # Pack data into message
+            # Byte 7: Rear right pressure (low byte)
+            msg_data[7] = pressure_val & 0xFF
+            
+            # Byte 6: Rear right pressure (high 6 bits) + bit flags
+            msg_data[6] |= ((pressure_val & 0x3F00) >> 8)
+            msg_data[6] |= 1 << 7  # DYNAMIC_HR = 1
+            
+            # Byte 5: Rear left pressure (low byte)
+            msg_data[5] = pressure_val & 0xFF
+            
+            # Byte 4: Rear left pressure (high 6 bits) + bit flags
+            msg_data[4] |= ((pressure_val & 0x3F00) >> 8)
+            msg_data[4] |= 1 << 7  # DYNAMIC_HL = 1
+            
+            # Byte 3: Front right pressure (low byte)
+            msg_data[3] = pressure_val & 0xFF
+            
+            # Byte 2: Front right pressure (high 6 bits) + flags
+            msg_data[2] = ((pressure_val & 0x3F00) >> 8)
+            msg_data[2] |= 1 << 6  # TESTMODE_HY = 1
+            msg_data[2] |= 1 << 7  # DYNAMIC_VR = 1
+            
+            # Byte 1: Front left pressure (low byte)
+            msg_data[1] = pressure_val & 0xFF
+            
+            # Byte 0: Front left pressure (high 6 bits) + flags
+            msg_data[0] = ((pressure_val & 0x3F00) >> 8)
+            msg_data[0] |= 1 << 6  # TESTMODE_RO = 1
+            msg_data[0] |= 1 << 7  # DYNAMIC_VL = 1
+            
         return msg_data
     
     def _build_message_152(self, counter: int) -> bytearray:
-        """Build CAN message 0x152 (system status).
-        
-        This message contains system status flags, vehicle information,
-        and the message counter.
-        
-        Args:
-            counter: Message counter (0-15)
-        
-        Returns:
-            8-byte CAN message data
-        """
+        """Build CAN message 0x152 (system status)."""
         msg_data = bytearray(8)
         
         # System flags (from original implementation)
@@ -371,15 +365,7 @@ class EHBDriver:
         return msg_data
     
     def set_pressure(self, pressure: float) -> bool:
-        """Set brake pressure command.
-        
-        Args:
-            pressure: Desired brake pressure in range [0.0, 1.0]
-                     where 0.0 = no braking, 1.0 = full braking
-        
-        Returns:
-            True if command accepted, False otherwise
-        """
+        """Set brake pressure command."""
         # Validate pressure range
         if not (0.0 <= pressure <= 1.0):
             self.logger.error(f"Invalid pressure {pressure}, must be in [0.0, 1.0]")
@@ -391,11 +377,7 @@ class EHBDriver:
         return True
     
     def is_connected(self) -> bool:
-        """Check if CAN bus connection is active and receiving messages.
-        
-        Returns:
-            True if connected and received a message recently (within timeout)
-        """
+        """Check if CAN bus connection is active and receiving messages."""
         with self._lock:
             if not self._connected:
                 return False
@@ -409,46 +391,27 @@ class EHBDriver:
             return time_since_last_message < self._can_timeout_sec
     
     def get_time_since_last_message(self) -> Optional[float]:
-        """Get time since last CAN message was received.
-        
-        Returns:
-            Time in seconds since last message, or None if no message received yet
-        """
+        """Get time since last CAN message was received."""
         with self._lock:
             if self._last_can_message_time is None:
                 return None
             return time.time() - self._last_can_message_time
     
     def has_can_communication(self) -> bool:
-        """Check if we're actively receiving CAN messages.
-        
-        Returns:
-            True if we received a CAN message in the last 0.5 seconds
-        """
+        """Check if we're actively receiving CAN messages."""
         return self.is_connected()
     
     def get_last_pressure(self) -> float:
-        """Get the last commanded pressure.
-        
-        Returns:
-            Last pressure command [0.0, 1.0]
-        """
+        """Get the last commanded pressure."""
         with self._lock:
             return self._last_pressure
     
     def stop(self) -> bool:
-        """Emergency stop - set brake pressure to 0.
-        
-        Returns:
-            True if successful
-        """
+        """Emergency stop - set brake pressure to 0."""
         return self.set_pressure(0.0)
     
     def close(self) -> None:
-        """Close CAN connection and cleanup.
-        
-        Stops transmission threads and sends a final zero pressure command.
-        """
+        """Close CAN connection and cleanup."""
         try:
             self.logger.info("Stopping EHB driver...")
             
@@ -476,4 +439,3 @@ class EHBDriver:
                 self.logger.error(f"Error closing CAN bus: {e}")
         
         self._connected = False
-
