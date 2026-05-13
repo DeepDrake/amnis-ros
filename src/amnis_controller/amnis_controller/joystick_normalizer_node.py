@@ -70,7 +70,7 @@ class JoystickNormalizerNode(Node):
 
         # The output topic where we publish JoystickCommand messages
         # Other nodes (like a vehicle controller) will listen to this
-        self.declare_parameter('output_topic', 'vehicle_controller_command')
+        self.declare_parameter('output_topic', 'normalized_joystick')
 
         # Which axes are triggers? Xbox controllers have triggers at axes 2 and 5
         # Triggers are special because they report [0, 1] instead of [-1, 1]

@@ -44,7 +44,7 @@ class PIDSteerControllerNode(Node):
 
         # ==================== Topic Configuration ====================
         self.declare_parameter('input_topic', 'normalized_joystick')
-        self.declare_parameter('output_topic', 'steering_vehicle_controller_command')
+        self.declare_parameter('output_topic', 'vehicle_controller_command')
         self.declare_parameter('feedback_topic', 'sensor_data')
         self.declare_parameter('diagnostic_topic', 'pid_diagnostics')
         
