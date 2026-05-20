@@ -60,7 +60,7 @@ def generate_launch_description():
         parameters=[{
             # Topic configuration
             'input_topic': 'normalized_joystick',           # From joystick normalizer
-            'output_topic': 'steering_vehicle_controller_command',  # To vehicle controller
+            'output_topic': 'vehicle_controller_command',  # To vehicle controller
             'feedback_topic': 'sensor_data',                # Pot meter feedback
             'diagnostic_topic': 'pid_diagnostics',
             # PID gains (tune these for optimal performance)
