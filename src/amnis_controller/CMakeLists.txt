@@ -83,6 +83,13 @@ install(PROGRAMS
   RENAME sensor_reader_node
 )
 
+install(PROGRAMS
+  amnis_controller/pid_steer_controller_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME pid_steer_controller_node
+)
+
+
 install(
   DIRECTORY launch resource
   DESTINATION share/${PROJECT_NAME}
