@@ -99,7 +99,7 @@ def generate_launch_description():
         name='vehicle_controller',
         output='screen',
         parameters=[{
-            'input_topic': 'steering_vehicle_controller_command',  # From PID controller
+            'input_topic': 'vehicle_controller_command',  # From PID controller
             'sensor_topic': 'sensor_data',
             'powertrain_topic': 'powertrain_command',
             'steer_topic': 'steer_command',
