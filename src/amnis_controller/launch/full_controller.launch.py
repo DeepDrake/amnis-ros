@@ -34,7 +34,7 @@ def generate_launch_description():
         }]
     )
     
-    # Joystick normalizer node
+    # Joystick normalizer node - normalizes raw joystick values
     joystick_node = Node(
         package='amnis_controller',
         executable='joystick_normalizer_node',
@@ -42,22 +42,64 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'input_topic': '/joy',
-            'output_topic': 'vehicle_controller_command',
+            'output_topic': 'normalized_joystick',  # Changed to feed PID controller
             'trigger_axes': [2],
             'deadzone': 0.05,
             'log_throttle_sec': 0.5,
-            'verbose': False,  # Logging disabled
+            'verbose': True,  # Logging enabled
+        }]
+    )
+    
+    # PID steering controller node - closed-loop steering control with pot meter feedback
+    # NOTE: Set 'enable_pid' to True once pot meter is repaired and calibrated!
+    pid_controller_node = Node(
+        package='amnis_controller',
+        executable='pid_steer_controller_node',
+        name='pid_steer_controller',
+        output='screen',
+        parameters=[{
+            # Topic configuration
+            'input_topic': 'normalized_joystick',           # From joystick normalizer
+            'output_topic': 'vehicle_controller_command',  # To vehicle controller
+            'feedback_topic': 'sensor_data',                # Pot meter feedback
+            'diagnostic_topic': 'pid_diagnostics',
+            # PID gains (tune these for optimal performance)
+            'kp': 1.5,              # Proportional gain
+            'ki': 0.2,              # Integral gain
+            'kd': 0.1,              # Derivative gain
+            # PID limits
+            'integral_limit': 0.5,          # Anti-windup limit
+            'output_limit': 1.0,            # Max output
+            'max_integral_time_sec': 2.0,   # Max integral accumulation time
+            # Pot meter mapping (configure based on physical setup)
+            'pot_min': 0.2,         # Pot value at full left
+            'pot_center': 0.35,      # Pot value at center (adjust after calibration)
+            'pot_max': 0.5,         # Pot value at full right
+            'pot_deadzone': 0.02,   # Deadzone around center
+            # Control parameters
+            'enable_pid': True,    # **SET TO TRUE WHEN POT METER IS FIXED**
+            'update_rate_hz': 10.0, # Match sensor_reader rate
+            'feedback_timeout_sec': 0.5,
+            'derivative_filter_alpha': 0.1,  # Derivative noise filtering
+            # Testing
+            'mock_mode': False,     # Set True to test PID without hardware
+            'mock_time_constant': 0.3,
+            # Diagnostics
+            'verbose': True,
+            'log_throttle_sec': 1.0,
+            'publish_diagnostics': True,
         }]
     )
     
     # Vehicle controller node with state machine
+    # Receives PID-corrected commands from pid_steer_controller_node
     controller_node = Node(
         package='amnis_controller',
         executable='vehicle_controller_node',
         name='vehicle_controller',
         output='screen',
         parameters=[{
-            'input_topic': 'vehicle_controller_command',
+            'input_topic': 'vehicle_controller_command',  # From PID controller
             'sensor_topic': 'sensor_data',
             'powertrain_topic': 'powertrain_command',
             'steer_topic': 'steer_command',
@@ -78,7 +120,7 @@ def generate_launch_description():
             'gas_override_raw_max': 1500,   # Trigger if raw ADC < 1500
             'verbose_override': True,       # Log override events
             'log_throttle_sec': 0.5,
-            'verbose': False,  # Logging disabled
+            'verbose': True,  # Logging enabled
         }]
     )
     
@@ -104,7 +146,7 @@ def generate_launch_description():
             'steer_to_power_scale': 100.0,
             'publish_diagnostics': True,
             'log_throttle_sec': 1.0,
-            'verbose': False,  # Logging disabled
+            'verbose': True,  # Logging enabled
         }]
     )
     
@@ -225,6 +267,7 @@ def generate_launch_description():
     return LaunchDescription([
         game_controller_node,
         joystick_node,
+        pid_controller_node,  # PID controller inserted between joystick and vehicle controller
         controller_node,
         steer_controller_node,
         brake_controller_node,
