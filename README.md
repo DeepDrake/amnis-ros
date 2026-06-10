@@ -22,8 +22,4 @@ To view and serve this documentation locally:
 
 ## Pulling the github repository on the jetson
 
-// ADD INSTRUCTIONS THAT INCLUDE THE CUSTOM SH SCRIPTS
-
-## Running the Ros2 workspace on the jetson
-
-// ADD INSTRUCTIONS THAT INCLUDE CUSTOM SH SCRIPTS ASWELL
+To pull/use branches on the Jetson, please use the provided documentation (Git load AMNIS) in the HandoverZIP
