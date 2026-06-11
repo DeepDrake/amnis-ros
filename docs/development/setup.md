@@ -1,12 +1,6 @@
 # Development Setup
 
-## Installation
 
-// UPDATE BY ADDING OUR CUSTOM SH SCRIPTS FROM THE JETSON
-
-## Run the Ros2
-
-// UPDATE BY ADDING OUR CUSTOM SH SCRIPTS FROM THE JETSON
 
 ## Building Documentation
 
