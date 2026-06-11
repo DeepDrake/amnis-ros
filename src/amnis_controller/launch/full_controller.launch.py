@@ -1,5 +1,4 @@
 """
-
 This launch file starts:
 0. joy_node - Publishes raw joystick data from hardware device
 1. joystick_normalizer_node - Normalizes joystick inputs
@@ -64,25 +63,23 @@ def generate_launch_description():
             'brake_topic': 'brake_command',
             'vehicle_state_topic': 'vehicle_state',
             'mode_command_topic': 'mode_command',
-            'safety_button': False,  # Simulated - will be hardware later
-            'mode_button': True,    # Simulated - will be hardware later
-            # External mode relay configuration (remote GPIO via pigpio)
+            'safety_button': False,
+            'mode_button': True,
             'enable_external_mode_control': True,
-            'external_mode_pin': 4,        # BCM GPIO 4 (physical pin 7)
-            'pigpio_host': '192.168.10.2',     # IP of Raspberry Pi running pigpiod
-            'pigpio_port': 8888,            # Default pigpiod port
-            'mock_mode': False,             # Set True for testing without hardware
-            # Gas pedal override configuration
-            'enable_gas_override': True,    # Enable automatic EXTERNAL→MANUAL on gas pedal press
-            'gas_override_raw_min': 500,    # Trigger if raw ADC > 500
-            'gas_override_raw_max': 1500,   # Trigger if raw ADC < 1500
-            'verbose_override': True,       # Log override events
+            'external_mode_pin': 4,
+            'pigpio_host': '192.168.10.2',
+            'pigpio_port': 8888,
+            'mock_mode': False,
+            'enable_gas_override': True,
+            'gas_override_raw_min': 500,
+            'gas_override_raw_max': 1500,
+            'verbose_override': True,
             'log_throttle_sec': 0.5,
-            'verbose': False,  # Logging disabled
+            'verbose': False,
         }]
     )
     
-    # Steer controller node - controls H-bridge via remote I2C (pigpio)
+    # Steer controller node
     steer_controller_node = Node(
         package='amnis_controller',
         executable='steer_controller_node',
@@ -91,24 +88,23 @@ def generate_launch_description():
         parameters=[{
             'input_topic': 'steer_command',
             'diagnostic_topic': 'steer_diagnostics',
-            'i2c_bus': 1,                    # I2C bus on Raspberry Pi (typically bus 1)
-            'i2c_address': 0x58,             # H-bridge I2C address
-            'max_power': 100,                # Maximum speed percentage
-            # Pigpio connection configuration
-            'pigpio_host': '192.168.10.2',      # IP of Raspberry Pi running pigpiod
-            'pigpio_port': 8888,             # Default pigpiod port
-            'mock_mode': False,              # Set True for testing without hardware
+            'i2c_bus': 1,
+            'i2c_address': 0x58,
+            'max_power': 100,
+            'pigpio_host': '192.168.10.2',
+            'pigpio_port': 8888,
+            'mock_mode': False,
             'command_timeout_sec': 0.5,
             'deadzone': 0.05,
             'update_rate_hz': 20.0,
             'steer_to_power_scale': 100.0,
             'publish_diagnostics': True,
             'log_throttle_sec': 1.0,
-            'verbose': False,  # Logging disabled
+            'verbose': False,
         }]
     )
     
-    # Brake controller node - controls EHB via CAN buss
+    # Brake controller node - Controls EHB via CAN bus AND Hardware Override
     brake_controller_node = Node(
         package='amnis_controller',
         executable='brake_controller_node',
@@ -117,20 +113,23 @@ def generate_launch_description():
         parameters=[{
             'input_topic': 'brake_command',
             'diagnostic_topic': 'brake_diagnostics',
-            'can_channel': 'can1',           # CAN channel (e.g., can0, can1, can2)
-            'can_interface': 'socketcan',    # CAN interface type
-            'pressure_scale': 40.0,          # Pressure scaling factor
-            'mock_mode': False,              # Set True for testing without hardware
+            'can_channel': 'can1',
+            'can_interface': 'socketcan',
+            'pressure_scale': 40.0,
+            'pedal_can_id': 0x180,
+            'pedal_byte_index': 1,
+            'pedal_threshold': 12,
+            'mock_mode': False,
             'command_timeout_sec': 0.5,
             'deadzone': 0.01,
             'update_rate_hz': 10.0,
             'publish_diagnostics': True,
             'log_throttle_sec': 1.0,
-            'verbose': False,  # Logging disabled
+            'verbose': False,
         }]
     )
     
-    # Powertrain controller node - controls throttle via PWM and transmission via relays
+    # Powertrain controller node
     powertrain_controller_node = Node(
         package='amnis_controller',
         executable='powertrain_controller_node',
@@ -139,29 +138,25 @@ def generate_launch_description():
         parameters=[{
             'input_topic': 'powertrain_command',
             'diagnostic_topic': 'powertrain_diagnostics',
-            # PWM throttle configuration (remote GPIO via pigpio)
-            'pwm_pin': 22,                   # BCM GPIO 22 (physical pin 15)
-            'pwm_frequency': 1000,           # PWM frequency in Hz
-            'max_throttle': 1.0,             # Maximum throttle (0.0-1.0, set lower for testing)
-            # Pigpio connection configuration
-            'pigpio_host': '192.168.10.2',      # IP of Raspberry Pi running pigpiod
-            'pigpio_port': 8888,             # Default pigpiod port
-            # Transmission relay configuration (gear control only - external mode in vehicle_controller)
+            'pwm_pin': 22,
+            'pwm_frequency': 1000,
+            'max_throttle': 1.0,
+            'pigpio_host': '192.168.10.2',
+            'pigpio_port': 8888,
             'enable_transmission_control': True,
-            'disable_neutral_pin': 12,       # BCM GPIO 12 (physical pin 32)
-            'enable_reverse_pin': 5,         # BCM GPIO 5 (physical pin 29)
-            # General configuration
-            'mock_mode': False,              # Set True for testing without hardware
+            'disable_neutral_pin': 12,
+            'enable_reverse_pin': 5,
+            'mock_mode': False,
             'command_timeout_sec': 0.5,
             'deadzone': 0.01,
             'update_rate_hz': 20.0,
             'publish_diagnostics': True,
             'log_throttle_sec': 1.0,
-            'verbose': False,  # Logging disabled
+            'verbose': False,
         }]
     )
     
-    # Sensor reader node - reads gas pedal and steering wheel from ADC
+    # Sensor reader node
     sensor_reader_node = Node(
         package='amnis_controller',
         executable='sensor_reader_node',
@@ -170,31 +165,25 @@ def generate_launch_description():
         parameters=[{
             'output_topic': 'sensor_data',
             'diagnostic_topic': 'sensor_diagnostics',
-            # Hardware configuration
-            'i2c_bus': 1,                    # I2C bus on Raspberry Pi
-            'i2c_address': 0x48,             # ADS1015L I2C address (ADDR to GND)
-            # Pigpio connection configuration
-            'pigpio_host': '192.168.10.2',      # IP of Raspberry Pi running pigpiod
-            'pigpio_port': 8888,             # Default pigpiod port
-            'mock_mode': False,              # Set True for testing without hardware
-            # Calibration (set these after calibrating your potentiometers)
-            # Gas pedal is inverted: 4093 when not pressed, 0 when pressed
-            'gas_pedal_min': 0,              # Raw ADC min value (fully pressed)
-            'gas_pedal_max': 4093,           # Raw ADC max value (not pressed)
-            'steering_wheel_min': 0,         # Raw ADC min value for steering wheel
-            'steering_wheel_max': 2047,      # Raw ADC max value for steering wheel
-            'auto_calibrate': False,         # Set True to auto-calibrate at startup
-            'calibration_duration_sec': 10.0,# Auto-calibration duration
-            # Control
-            'update_rate_hz': 10.0,          # Sensor reading rate (lower to reduce I2C bus contention)
-            # Diagnostics
+            'i2c_bus': 1,
+            'i2c_address': 0x48,
+            'pigpio_host': '192.168.10.2',
+            'pigpio_port': 8888,
+            'mock_mode': False,
+            'gas_pedal_min': 0,
+            'gas_pedal_max': 4093,
+            'steering_wheel_min': 0,
+            'steering_wheel_max': 2047,
+            'auto_calibrate': False,
+            'calibration_duration_sec': 10.0,
+            'update_rate_hz': 10.0,
             'publish_diagnostics': True,
             'log_throttle_sec': 1.0,
-            'verbose': True,                 # Set to True to enable debug logging
+            'verbose': True,
         }]
     )
     
-    # Topic aggregator node - exposes ROS topics over WebSockets
+    # Topic aggregator node
     aggregator_node = Node(
         package='amnis_controller',
         executable='topic_aggregator_node',
@@ -206,12 +195,11 @@ def generate_launch_description():
             'ignored_topics': ['/parameter_events', '/rosout'],
             'websocket_host': '0.0.0.0',
             'websocket_port': 8765,
-            'update_frequency_hz': 30.0,  # Throttle updates to 0.5Hz (2 seconds) to reduce resource usage must be float
+            'update_frequency_hz': 30.0,
         }]
     )
     
-    # Firefox browser - opens dashboard in kiosk mode (fullscreen)
-    # Construct absolute path to dashboard.html (one directory up from src)
+    # Firefox browser
     workspace_dir = Path(os.getcwd())
     dashboard_path = workspace_dir / 'dashboard.html'
     dashboard_url = f'file://{dashboard_path.absolute()}'
@@ -233,4 +221,3 @@ def generate_launch_description():
         aggregator_node,
         firefox_process,
     ])
-
