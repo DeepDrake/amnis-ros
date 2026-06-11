@@ -1,84 +1,134 @@
-
-
 # Steer Controller Node
 
 **Node Name:** `steer_controller`
 
-The Steer Controller node manages the vehicle's steering actuator. It converts high-level steering commands into low-level motor control signals and communicates with the steering H-bridge motor driver over I2C. The node provides safety monitoring, command validation, hardware diagnostics, and automatic shutdown protection.
+The Steer Controller node implements closed-loop steering control for the vehicle. It receives steering commands from the Vehicle Controller and steering wheel position feedback from the Sensor Reader node. Using a proportional control algorithm and filtered potentiometer feedback, it continuously adjusts the steering motor until the requested steering position is reached.
+
+The node communicates with the steering H-bridge motor driver over I2C and includes safety monitoring, watchdog protection, hardware diagnostics, and communication error handling.
 
 ## Responsibilities
 
-1. **Steering Command Processing**: Receives normalized steering commands and converts them into motor direction and speed values for the steering actuator.
+1. **Closed-Loop Steering Control**: Uses steering wheel position feedback from the potentiometer to drive the steering actuator toward the requested position.
 
-2. **I2C Hardware Communication**: Interfaces with the H-bridge motor driver over I2C to control steering motor movement.
+2. **Proportional Control**: Calculates motor speed based on the difference between the target steering position and the current steering position.
 
-3. **Safety Watchdog**: Monitors incoming steering commands. If no command is received within the timeout period (default 0.5s), the steering motor is stopped automatically.
+3. **Exponential Steering Mapping**: Applies a cubic steering curve to improve steering precision around the center position while maintaining full steering range.
 
-4. **Command Validation**: Applies a deadzone to filter small steering inputs caused by joystick drift or signal noise.
+4. **Sensor Filtering**: Uses an exponential moving average filter to reduce noise in potentiometer feedback.
 
-5. **Error Handling**: Monitors communication errors with the H-bridge driver and can automatically stop steering operation after repeated failures.
+5. **H-Bridge Motor Control**: Converts steering corrections into motor direction and speed commands for the steering actuator.
 
-6. **Diagnostics**: Publishes real-time status information including steering commands, motor state, connection health, timeout status, and communication error counts.
+6. **Safety Watchdog**: Automatically stops the steering motor if steering commands are no longer received.
+
+7. **Diagnostics**: Publishes steering targets, actual positions, motor commands, timeout state, and hardware status information.
 
 ## Subscribed Topics
 
 | Topic | Type | Description |
 | :---- | :---- | :---------- |
-| `steer_command` | `amnis_controller/msg/SteerCommand` | Input command containing the desired steering value in the range `[-1.0, 1.0]`. |
+| `steer_command` | `amnis_controller/msg/SteerCommand` | Desired steering position command from the Vehicle Controller. |
+| `sensor_data` | `amnis_controller/msg/SensorData` | Steering wheel potentiometer feedback from the Sensor Reader node. |
 
 ## Published Topics
 
 | Topic | Type | Description |
 | :---- | :---- | :---------- |
-| `steer_diagnostics` | `std_msgs/msg/String` | Diagnostic information including steering state, connection status, timeout state, and error counters. |
+| `steer_diagnostics` | `std_msgs/msg/String` | Diagnostic information including steering target, actual position, motor direction, speed, and timeout status. |
 
-## Steering Command Mapping
+## Control Strategy
 
-The node converts incoming steering values into motor direction and speed commands.
+### Steering Setpoint Generation
 
-### Steering (`steer`)
-
-| Input Range | Direction | Motor Direction |
-| :---------- | :-------- | :-------------- |
-| `> 0.0` | Right | `2` |
-| `< 0.0` | Left | `1` |
-| `= 0.0` | Stop | `0` |
-
-### Speed Calculation
-
-Motor speed is calculated as:
+The incoming steering command is transformed using an exponential curve:
 
 ```text
-speed = abs(steer) * steer_to_power_scale
+expo_input = steer³
 ```
 
-With the default scale factor of `100.0`, steering values are mapped directly to motor output percentage:
+This provides:
 
-| Steer Value | Motor Speed |
-| :---------- | :---------- |
-| `0.25` | `25%` |
-| `0.50` | `50%` |
-| `1.00` | `100%` |
+- Higher precision around the center position.
+- Smoother low-speed steering response.
+- Full steering authority at large steering inputs.
+
+The resulting value is converted into a target potentiometer position using the configured steering calibration parameters.
+
+### Feedback Filtering
+
+The steering wheel position is measured using a potentiometer connected through the Sensor Reader node.
+
+To reduce sensor noise, the node applies an Exponential Moving Average (EMA) filter:
+
+```text
+filtered = α × current + (1 - α) × previous
+```
+
+where `α` is configured using the `filter_alpha` parameter.
+
+### Proportional Control
+
+The steering error is calculated as:
+
+```text
+error = target_position - actual_position
+```
+
+Motor speed is then determined using a proportional gain:
+
+```text
+speed = |error| × kp
+```
+
+The output is automatically limited to:
+
+- Minimum speed: `20%`
+- Maximum speed: `100%`
+
+### Deadzone
+
+A configurable deadzone prevents oscillation when the steering wheel reaches the target position.
+
+If:
+
+```text
+|error| < deadzone
+```
+
+the steering motor is stopped.
+
+## Steering Direction Logic
+
+| Condition | Direction |
+| :-------- | :-------- |
+| Error > 0 | Left |
+| Error < 0 | Right |
+| Error within deadzone | Stop |
+
+The controller continuously adjusts motor direction and speed until the steering wheel reaches the target position.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 | :-------- | :--- | :------ | :---------- |
-| `input_topic` | `string` | `'steer_command'` | Input topic name. |
+| `input_topic` | `string` | `'steer_command'` | Input steering command topic. |
+| `sensor_topic` | `string` | `'sensor_data'` | Steering feedback topic. |
 | `diagnostic_topic` | `string` | `'steer_diagnostics'` | Diagnostic output topic. |
 | `i2c_bus` | `int` | `1` | I2C bus used for H-bridge communication. |
-| `i2c_address` | `int` | `0x58` | I2C address of the H-bridge driver. |
+| `i2c_address` | `int` | `0x58` | H-bridge I2C address. |
 | `max_power` | `int` | `100` | Maximum motor power output. |
-| `mock_mode` | `bool` | `False` | Simulates hardware for testing without a physical steering controller. |
+| `mock_mode` | `bool` | `False` | Simulates hardware for testing. |
 | `pigpio_host` | `string` | `'localhost'` | Hostname of the pigpio daemon. |
 | `pigpio_port` | `int` | `8888` | Port used to communicate with pigpio. |
-| `command_timeout_sec` | `double` | `0.5` | Safety timeout; stops steering if exceeded. |
-| `deadzone` | `double` | `0.05` | Steering inputs below this threshold are treated as zero. |
-| `auto_stop_on_error` | `bool` | `True` | Automatically stop steering after excessive communication errors. |
-| `error_threshold` | `int` | `3` | Number of consecutive errors before triggering an automatic stop. |
-| `update_rate_hz` | `double` | `50.0` | Frequency of hardware updates in Hz. |
-| `steer_to_power_scale` | `double` | `100.0` | Scaling factor used to convert steering commands into motor power. |
-| `publish_diagnostics` | `bool` | `True` | Enables diagnostic message publishing. |
+| `command_timeout_sec` | `double` | `0.5` | Timeout before steering motor is stopped. |
+| `auto_stop_on_error` | `bool` | `True` | Automatically stop after repeated communication errors. |
+| `error_threshold` | `int` | `3` | Number of consecutive errors before protection activates. |
+| `update_rate_hz` | `double` | `50.0` | Steering control update frequency. |
+| `potmeter_center` | `double` | `0.375` | Potentiometer value corresponding to centered steering. |
+| `potmeter_range` | `double` | `0.175` | Distance from center to full steering lock. |
+| `kp` | `double` | `700.0` | Proportional control gain. |
+| `deadzone` | `double` | `0.01` | Error threshold below which steering stops. |
+| `filter_alpha` | `double` | `0.4` | Exponential moving average filter coefficient. |
+| `publish_diagnostics` | `bool` | `True` | Enables diagnostic publishing. |
 | `log_throttle_sec` | `double` | `1.0` | Time between status log messages. |
 | `verbose` | `bool` | `True` | Enables detailed console logging. |
 
@@ -86,29 +136,49 @@ With the default scale factor of `100.0`, steering values are mapped directly to
 
 ### Command Timeout Protection
 
-If no steering command is received within `command_timeout_sec`, the node:
+If no steering command is received within `command_timeout_sec`:
 
-- Stops the steering motor.
-- Sets motor direction to `0` (STOP).
-- Marks the controller as timed out.
-- Waits for a new command before resuming operation.
+- The steering motor is stopped.
+- Motor direction is set to zero.
+- The controller enters a timeout state.
+- Steering resumes only after a new command is received.
 
-### Deadzone Filtering
+### Communication Error Protection
 
-Steering values whose magnitude is below the configured deadzone are treated as zero to prevent unintended steering movements.
+The node continuously monitors H-bridge communication errors.
 
-### Automatic Error Protection
+If repeated communication failures occur:
 
-The node continuously monitors H-bridge communication errors. If the number of consecutive errors exceeds `error_threshold`, the driver can automatically stop steering operation to protect the hardware.
+- Errors are counted and logged.
+- Automatic stop protection can be activated using `auto_stop_on_error`.
+
+### Feedback Validation
+
+Steering control only operates when both:
+
+- A steering command has been received.
+- Valid steering position feedback is available.
+
+This prevents uncontrolled steering motion during startup or sensor failures.
+
+## Diagnostics
+
+The diagnostic topic includes:
+
+- Target steering position
+- Actual steering position
+- Motor direction
+- Motor speed
+- Command timeout status
+
+These diagnostics can be viewed in the dashboard or ROS tools to verify steering performance and assist with controller tuning.
 
 ## Shutdown Behavior
 
-When the node is shut down:
+When the node shuts down:
 
 1. A final stop command is sent to the steering motor.
 2. The H-bridge connection is closed safely.
-3. All ROS 2 resources are released.
+3. ROS timers and publishers are cleaned up.
 
 This ensures the steering actuator cannot continue moving after the node exits or the system is powered down.
-
-ADD after proper implementation of PID node
