@@ -43,6 +43,7 @@ nav:
     - Joystick normalizer: nodes/joystick_normalizer.md
     - Vehicle Controller: nodes/vehicle_controller.md
     - PID Steering Controller: nodes/PID_node.md
+    - Sensor reader node: nodes/Sensor_reader_node.md
     - Steer Controller: nodes/steer_controller.md
     - Brake Controller: nodes/brake_controller.md
     - Powertrain Controller: nodes/powertrain_controller.md
