@@ -14,4 +14,4 @@ This section documents the ROS 2 nodes in the `amnis_controller` package.
 | [Powertrain Controller](powertrain_controller.md) | Controls the vehicle's powertrain (motors).                          |
 | [Topic Aggregator](topic_aggregator.md)           | Aggregates and exposes ROS topics over WebSockets for the dashboard. |
 | [PID steer controller](PID_node.md)               | Generates steering commands based on input from the joystick normalizer and sensor data |
-| [Sensor reader](Sensor_reader_node.md)            | Exctracts and normalizes sensor values. |
+| [Sensor reader](sensor_reader_node.md)            | Exctracts and normalizes sensor values. |
