@@ -46,6 +46,7 @@ nav:
     - Brake Controller: nodes/brake_controller.md
     - Powertrain Controller: nodes/powertrain_controller.md
     - Topic Aggregator: nodes/topic_aggregator.md
+    - Sensor Reader Node: nodes/sensor_reader_node.md
     
     
   
