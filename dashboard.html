@@ -2,441 +2,140 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AMNIS Vehicle Dashboard</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            overflow-x: hidden;
-            overflow-y: auto;
+            color: #e0e0e0; height: 100vh; width: 100vw; overflow: hidden;
+            display: flex; flex-direction: column; padding: 10px; gap: 10px;
         }
 
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto auto auto;
-            gap: 12px;
-            padding: 12px;
-            max-height: 100vh;
-            overflow-y: auto;
-            background: radial-gradient(circle at 20% 50%, rgba(66, 135, 245, 0.1) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
-        }
-
-        .dashboard.main-view {
-            grid-template-columns: 1fr 1fr;
-        }
-
-        .dashboard.details-view {
-            grid-template-columns: 1fr;
-            grid-template-rows: auto;
-        }
-
+        /* --- Header --- */
         .header {
-            grid-column: 1 / -1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 24px;
-            background: rgba(20, 20, 35, 0.8);
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(100, 150, 255, 0.2);
+            display: flex; justify-content: space-between; align-items: center; padding: 8px 16px;
+            background: rgba(20, 20, 35, 0.8); border-radius: 8px; backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 150, 255, 0.2); flex-shrink: 0; height: 50px;
         }
 
         .header h1 {
-            font-size: 28px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #4287f5, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 22px; font-weight: 700; background: linear-gradient(135deg, #4287f5, #8b5cf6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
 
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-        }
+        .status-indicator { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
+        .status-dot.disconnected { background: #ef4444; animation: pulse-danger 0.8s infinite; }
 
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #10b981;
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
-            animation: pulse 2s infinite;
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes pulse-danger { 0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); } 50% { opacity: 0.3; } }
 
-        .status-dot.disconnected {
-            background: #ef4444;
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-            animation: pulse-danger 0.8s infinite;
-        }
+        /* --- Pagina Layout --- */
+        .page { display: none; flex: 1; min-height: 0; }
+        .page.active.main-view { display: flex; flex-direction: row; gap: 12px; }
+        .page.active.details-view { display: flex; flex-direction: column; }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        .col-left { display: flex; flex-direction: column; width: 320px; gap: 12px; }
+        .col-right { display: flex; flex-direction: column; flex: 1; gap: 12px; }
 
-        @keyframes pulse-danger {
-            0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
-            50% { opacity: 0.3; box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
-        }
+        .card-throttle, .card-brake { flex: 1; }
+        .card-control { flex: 0 0 auto; }
+        .card-cruise { flex: 1; }
 
+        /* --- Basis Card Styling --- */
         .card {
-            background: rgba(30, 30, 50, 0.6);
-            border: 1px solid rgba(100, 150, 255, 0.2);
-            border-radius: 12px;
-            padding: 12px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-        }
-
-        .card:hover {
-            border-color: rgba(100, 150, 255, 0.4);
-            box-shadow: 0 8px 32px rgba(66, 135, 245, 0.2);
-            background: rgba(30, 30, 50, 0.8);
+            background: rgba(30, 30, 50, 0.6); border: 1px solid rgba(100, 150, 255, 0.2);
+            border-radius: 8px; padding: 12px; backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column;
         }
 
         .card-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #4287f5;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            font-size: 13px; font-weight: 600; color: #4287f5; margin-bottom: 6px;
+            text-transform: uppercase; letter-spacing: 1px; flex-shrink: 0;
         }
 
+        /* --- Meters (Gauges) --- */
         .gauge-container {
-            position: relative;
-            width: 100%;
-            max-width: 280px;
-            min-width: 280px;
-            margin: 0 auto;
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: relative; width: 100%; max-width: 180px; margin: auto; aspect-ratio: 1;
+            display: flex; align-items: center; justify-content: center;
         }
 
-        .gauge {
-            width: 100%;
-            height: 100%;
-            min-width: 280px;
-            min-height: 280px;
-        }
-
-        .gauge-arc {
-            fill: none;
-            stroke: rgba(100, 150, 255, 0.3);
-            stroke-width: 8;
-            stroke-linecap: round;
-            transform-origin: center;
-            transform: rotate(-90deg);
-        }
-
+        .gauge { width: 100%; height: 100%; }
+        .gauge-arc { fill: none; stroke: rgba(100, 150, 255, 0.3); stroke-width: 8; stroke-linecap: round; transform-origin: center; transform: rotate(-90deg); }
         .gauge-value {
-            fill: none;
-            stroke: url(#gaugeGradient);
-            stroke-width: 8;
-            stroke-linecap: round;
-            transition: stroke-dashoffset 0.3s ease;
-            transform-origin: center;
-            transform: rotate(-90deg);
-            stroke-dasharray: 502.65;
-            stroke-dashoffset: 502.65;
+            fill: none; stroke: url(#gaugeGradient); stroke-width: 8; stroke-linecap: round;
+            transition: stroke-dashoffset 0.3s ease; transform-origin: center; transform: rotate(-90deg);
+            stroke-dasharray: 502.65; stroke-dashoffset: 502.65;
         }
+        .gauge-value.brake { stroke: url(#brakeGradient); }
+        .gauge-text { font-size: 26px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; fill: #e0e0e0; }
+        .gauge-unit { font-size: 12px; text-anchor: middle; dominant-baseline: middle; fill: #a0a0b0; }
+        .gauge-gear { font-size: 16px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; fill: #4287f5; }
 
-        .gauge-value.brake {
-            stroke: url(#brakeGradient);
-        }
-
-        .gauge-text {
-            font-size: 32px;
-            font-weight: 700;
-            text-anchor: middle;
-            dominant-baseline: middle;
-            fill: #e0e0e0;
-        }
-
-        .gauge-unit {
-            font-size: 14px;
-            text-anchor: middle;
-            dominant-baseline: middle;
-            fill: #a0a0b0;
-        }
-
-        .gauge-gear {
-            font-size: 16px;
-            font-weight: 600;
-            text-anchor: middle;
-            dominant-baseline: middle;
-            fill: #4287f5;
-            text-transform: uppercase;
-        }
-
-        .grid-full-width {
-            grid-column: 1 / -1;
-        }
-
-        /* --- Cruise Control CSS --- */
-        .cc-container {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            padding: 8px;
-        }
-
-        .cc-info-row {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            background: rgba(15, 15, 25, 0.5);
-            border-radius: 8px;
-            padding: 16px;
-            border: 1px solid rgba(100, 150, 255, 0.1);
-        }
-
-        .cc-data-box {
-            text-align: center;
-        }
-
-        .cc-label {
-            font-size: 12px;
-            color: #a0a0b0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
-        }
-
-        .cc-value-container {
-            display: flex;
-            align-items: baseline;
-            justify-content: center;
-            gap: 4px;
-        }
-
-        .cc-speed {
-            font-size: 36px;
-            font-weight: 700;
-            color: #e0e0e0;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-        }
-
-        .cc-speed-unit {
-            font-size: 14px;
-            color: #a0a0b0;
-        }
-
-        .cc-status-indicator {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            background: rgba(100, 100, 100, 0.2);
-            color: #a0a0b0;
-            margin-top: 8px;
-            display: inline-block;
-        }
-
-        .cc-status-indicator.active {
-            background: rgba(16, 185, 129, 0.2);
-            color: #10b981;
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-        }
-
-        .cc-controls-row {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-        }
-
-        .cc-btn {
-            flex: 1;
-            padding: 14px 10px;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        .cc-btn:active {
-            transform: translateY(2px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .cc-btn-set {
-            background: linear-gradient(135deg, #10b981, #059669);
-            flex: 1.5;
-        }
-        .cc-btn-set:hover { box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
-
-        .cc-btn-adjust {
-            background: linear-gradient(135deg, #4287f5, #2563eb);
-            font-size: 16px;
-        }
-        .cc-btn-adjust:hover { box-shadow: 0 0 15px rgba(66, 135, 245, 0.5); }
-
-        .cc-btn-cancel {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-        }
-        .cc-btn-cancel:hover { box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
-        /* ----------------------- */
-
-        .vehicle-control-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 16px 24px;
-        }
-
-        .control-mode-display {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .control-mode-label {
-            font-size: 14px;
-            color: #a0a0b0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .control-mode-value {
-            font-size: 24px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 20px currentColor;
-            transition: all 0.3s ease;
-        }
-
+        /* --- Voertuig Controles --- */
+        .vehicle-control-card { display: flex; align-items: center; justify-content: space-between; padding: 0 10px; }
+        .control-mode-display { display: flex; align-items: center; gap: 12px; }
+        .control-mode-label { font-size: 12px; color: #a0a0b0; text-transform: uppercase; }
+        
+        .control-mode-value { font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 0 10px currentColor; }
         .control-mode-value.state-EXTERNAL { color: #10b981; }
         .control-mode-value.state-MANUAL { color: #fbbf24; }
         .control-mode-value.state-EHB_ERROR, .control-mode-value.state-IMMOBILIZED { color: #ef4444; }
 
         .mode-button {
-            padding: 12px 32px;
-            background: linear-gradient(135deg, #10b981, #059669);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-            white-space: nowrap;
+            padding: 8px 16px; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 6px; color: white;
+            font-size: 12px; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
         }
+        .mode-button.hidden { display: none; }
 
-        .mode-button:hover:not(:disabled) {
-            transform: translateY(-2px);
+        /* --- Cruise Control CSS --- */
+        .cc-container { display: flex; flex-direction: column; gap: 12px; flex-grow: 1; }
+        .cc-info-row { display: flex; justify-content: space-around; align-items: center; background: rgba(15, 15, 25, 0.5); border-radius: 8px; padding: 10px; border: 1px solid rgba(100, 150, 255, 0.1); }
+        .cc-data-box { text-align: center; }
+        .cc-label { font-size: 12px; color: #a0a0b0; text-transform: uppercase; margin-bottom: 2px; }
+        .cc-value-container { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+        .cc-speed { font-size: 38px; font-weight: 700; color: #e0e0e0; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2); }
+        .cc-speed-unit { font-size: 12px; color: #a0a0b0; }
+
+        .cc-status-indicator { padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; background: rgba(100, 100, 100, 0.2); color: #a0a0b0; display: inline-block; }
+        .cc-status-indicator.active { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+
+        .cc-controls-row { display: flex; gap: 12px; justify-content: space-between; flex-grow: 1; align-items: stretch; }
+        .cc-btn {
+            flex: 1; border: none; border-radius: 8px; color: white; font-size: 18px; font-weight: 700; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
         }
+        .cc-btn:active { transform: translateY(2px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+        .cc-btn-set { background: linear-gradient(135deg, #10b981, #059669); flex: 1.2; }
+        .cc-btn-adjust { background: linear-gradient(135deg, #4287f5, #2563eb); font-size: 36px; } 
+        .cc-btn-cancel { background: linear-gradient(135deg, #ef4444, #dc2626); }
 
-        .mode-button.hidden {
-            display: none;
-        }
+        /* --- Raw Data View --- */
+        .details-view .card { flex: 1; overflow: hidden; }
+        .raw-data-container { flex: 1; overflow-y: auto; margin-top: 8px; padding-right: 8px; }
+        .raw-data-container::-webkit-scrollbar { width: 8px; }
+        .raw-data-container::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 4px; }
+        .raw-data-container::-webkit-scrollbar-thumb { background: rgba(100, 150, 255, 0.3); border-radius: 4px; }
+        .topic-card { background: rgba(30, 30, 50, 0.6); border: 1px solid rgba(100, 150, 255, 0.2); border-radius: 6px; padding: 10px; margin-bottom: 8px; }
+        .topic-data { font-family: 'Courier New', monospace; font-size: 11px; color: #e0e0e0; background: rgba(0, 0, 0, 0.3); padding: 8px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
 
+        /* --- Navigatie Knop --- */
         .nav-button {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #4287f5, #8b5cf6);
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(66, 135, 245, 0.4);
-            transition: all 0.3s ease;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%;
+            background: linear-gradient(135deg, #4287f5, #8b5cf6); border: none; color: white; font-size: 24px;
+            cursor: pointer; box-shadow: 0 4px 16px rgba(66, 135, 245, 0.5); z-index: 1000;
         }
 
-        .page { display: none; }
-        .page.active { display: grid; }
-
-        .raw-data-container {
-            height: calc(100vh - 120px);
-            overflow-y: auto;
-        }
-
-        .topic-card {
-            background: rgba(30, 30, 50, 0.6);
-            border: 1px solid rgba(100, 150, 255, 0.2);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 12px;
-        }
-
-        .topic-data {
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            color: #e0e0e0;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px;
-            border-radius: 4px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
+        /* --- Foutmelding --- */
         .connection-error {
-            grid-column: 1 / -1;
-            padding: 16px;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: 8px;
-            color: #fca5a5;
-            text-align: center;
-            display: none;
+            position: fixed; top: 10px; left: 50%; transform: translateX(-50%); padding: 10px 20px;
+            background: rgba(239, 68, 68, 0.95); border: 1px solid #ef4444; border-radius: 6px; color: white;
+            font-weight: bold; font-size: 14px; z-index: 2000; display: none;
         }
-
-        .connection-error.show {
-            display: block;
-        }
-
-        .grid-1-col { grid-column: span 1; }
-
-        @media (max-width: 1024px) {
-            .dashboard {
-                grid-template-columns: 1fr;
-            }
-            .cc-controls-row {
-                flex-wrap: wrap;
-            }
-            .cc-btn {
-                min-width: calc(50% - 12px);
-            }
-        }
+        .connection-error.show { display: block; }
     </style>
 </head>
 <body>
@@ -452,98 +151,99 @@
         </div>
     </div>
 
-    <div class="dashboard page active main-view" id="mainPage">
+    <div class="page active main-view" id="mainPage">
         
-        <div class="card grid-1-col">
-            <div class="card-title">Throttle</div>
-            <div class="gauge-container">
-                <svg class="gauge" viewBox="0 0 200 200">
-                    <defs>
-                        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#4287f5;stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
-                        </linearGradient>
-                    </defs>
-                    <circle class="gauge-arc" cx="100" cy="100" r="80" />
-                    <circle class="gauge-value" id="throttleArc" cx="100" cy="100" r="80" />
-                    <text class="gauge-text" id="throttleValue" x="100" y="85">0</text>
-                    <text class="gauge-unit" x="100" y="105">%</text>
-                    <text class="gauge-gear" id="gearDisplay" x="100" y="130">N</text>
-                </svg>
-            </div>
-        </div>
-
-        <div class="card grid-1-col">
-            <div class="card-title">Brake</div>
-            <div class="gauge-container">
-                <svg class="gauge" viewBox="0 0 200 200">
-                    <defs>
-                        <linearGradient id="brakeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
-                            <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
-                        </linearGradient>
-                    </defs>
-                    <circle class="gauge-arc" cx="100" cy="100" r="80" style="stroke: rgba(239, 68, 68, 0.3);" />
-                    <circle class="gauge-value brake" id="brakeArc" cx="100" cy="100" r="80" />
-                    <text class="gauge-text" id="brakeValue" x="100" y="85">0</text>
-                    <text class="gauge-unit" x="100" y="105">%</text>
-                    <text class="gauge-unit" x="100" y="130" style="fill: #ef4444;">PRESSURE</text>
-                </svg>
-            </div>
-        </div>
-
-        <div class="card grid-full-width">
-            <div class="vehicle-control-card">
-                <div class="control-mode-display">
-                    <span class="control-mode-label">Control Mode:</span>
-                    <span class="control-mode-value" id="vehicleStateValue">UNKNOWN</span>
+        <div class="col-left">
+            <div class="card card-throttle">
+                <div class="card-title">Throttle</div>
+                <div class="gauge-container">
+                    <svg class="gauge" viewBox="0 0 200 200">
+                        <defs>
+                            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#4287f5;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <circle class="gauge-arc" cx="100" cy="100" r="80" />
+                        <circle class="gauge-value" id="throttleArc" cx="100" cy="100" r="80" />
+                        <text class="gauge-text" id="throttleValue" x="100" y="85">0</text>
+                        <text class="gauge-unit" x="100" y="105">%</text>
+                        <text class="gauge-gear" id="gearDisplay" x="100" y="130">N</text>
+                    </svg>
                 </div>
-                <button class="mode-button hidden" id="switchToExternalBtn" onclick="switchToExternal()">
-                    ↻ Switch to External
-                </button>
+            </div>
+
+            <div class="card card-brake">
+                <div class="card-title">Brake</div>
+                <div class="gauge-container">
+                    <svg class="gauge" viewBox="0 0 200 200">
+                        <defs>
+                            <linearGradient id="brakeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <circle class="gauge-arc" cx="100" cy="100" r="80" style="stroke: rgba(239, 68, 68, 0.3);" />
+                        <circle class="gauge-value brake" id="brakeArc" cx="100" cy="100" r="80" />
+                        <text class="gauge-text" id="brakeValue" x="100" y="85">0</text>
+                        <text class="gauge-unit" x="100" y="105">%</text>
+                        <text class="gauge-unit" x="100" y="130" style="fill: #ef4444; font-size: 10px;">PRESSURE</text>
+                    </svg>
+                </div>
             </div>
         </div>
 
-        <div class="card grid-full-width">
-            <div class="card-title">Cruise Control</div>
-            <div class="cc-container">
-                
-                <div class="cc-info-row">
-                    <div class="cc-data-box">
-                        <div class="cc-label">Current Speed</div>
-                        <div class="cc-value-container">
-                            <div class="cc-speed" id="uiCurrentSpeed">0</div>
-                            <div class="cc-speed-unit">km/h</div>
+        <div class="col-right">
+            <div class="card card-control">
+                <div class="vehicle-control-card">
+                    <div class="control-mode-display">
+                        <span class="control-mode-label">Mode:</span>
+                        <span class="control-mode-value" id="vehicleStateValue">UNKNOWN</span>
+                    </div>
+                    <button class="mode-button hidden" id="switchToExternalBtn" onclick="switchToExternal()">
+                        ↻ External
+                    </button>
+                </div>
+            </div>
+
+            <div class="card card-cruise">
+                <div class="card-title">Cruise Control</div>
+                <div class="cc-container">
+                    <div class="cc-info-row">
+                        <div class="cc-data-box">
+                            <div class="cc-label">Current</div>
+                            <div class="cc-value-container">
+                                <div class="cc-speed" id="uiCurrentSpeed">0</div>
+                                <div class="cc-speed-unit">km/h</div>
+                            </div>
+                        </div>
+                        
+                        <div class="cc-data-box">
+                            <div class="cc-label">Target</div>
+                            <div class="cc-value-container">
+                                <div class="cc-speed" style="color: #4287f5;" id="uiTargetSpeed">0</div>
+                                <div class="cc-speed-unit">km/h</div>
+                            </div>
+                            <div class="cc-status-indicator" id="uiCcStatus">OFF</div>
                         </div>
                     </div>
-                    
-                    <div class="cc-data-box">
-                        <div class="cc-label">Target Speed</div>
-                        <div class="cc-value-container">
-                            <div class="cc-speed" style="color: #4287f5;" id="uiTargetSpeed">0</div>
-                            <div class="cc-speed-unit">km/h</div>
-                        </div>
-                        <div class="cc-status-indicator" id="uiCcStatus">OFF</div>
+
+                    <div class="cc-controls-row">
+                        <button class="cc-btn cc-btn-set" onclick="sendCCCommand('SET')">Set</button>
+                        <button class="cc-btn cc-btn-adjust" onclick="sendCCCommand('UP')">+</button>
+                        <button class="cc-btn cc-btn-adjust" onclick="sendCCCommand('DOWN')">-</button>
+                        <button class="cc-btn cc-btn-cancel" onclick="sendCCCommand('CANCEL')">Cancel</button>
                     </div>
                 </div>
-
-                <div class="cc-controls-row">
-                    <button class="cc-btn cc-btn-set" onclick="sendCCCommand('SET')">Set CC</button>
-                    <button class="cc-btn cc-btn-adjust" onclick="sendCCCommand('UP')">+1</button>
-                    <button class="cc-btn cc-btn-adjust" onclick="sendCCCommand('DOWN')">-1</button>
-                    <button class="cc-btn cc-btn-cancel" onclick="sendCCCommand('CANCEL')">Brake / Cancel</button>
-                </div>
-
             </div>
         </div>
-
     </div>
 
-    <div class="dashboard page details-view" id="rawDataPage">
-        <div class="card" style="grid-column: 1 / -1;">
+    <div class="page details-view" id="rawDataPage">
+        <div class="card">
             <div class="card-title">📡 Raw Topic Data</div>
             <div class="raw-data-container" id="rawDataContainer">
-                <div class="no-data">Waiting for data...</div>
+                <div class="no-data" style="font-size: 14px; color: #a0a0b0; padding: 10px;">Waiting for data...</div>
             </div>
         </div>
     </div>
@@ -551,16 +251,10 @@
     <button class="nav-button" id="navButton" onclick="togglePage()">📡</button>
 
     <script>
-        // Configuration
-        const DASHBOARD_CONFIG = {
-            ws_url: null, // null = auto-detect, or set to 'ws://your-robot-ip:8765'
-        };
-
-        // Global reference to dashboard instance
+        const DASHBOARD_CONFIG = { ws_url: null };
         let dashboardInstance = null;
-
-        // Page navigation
         let currentPage = 'main';
+
         function togglePage() {
             const mainPage = document.getElementById('mainPage');
             const rawDataPage = document.getElementById('rawDataPage');
@@ -579,16 +273,11 @@
             }
         }
 
-        // --- Cruise Control Button Handler ---
         function sendCCCommand(action) {
-            if (dashboardInstance) {
-                dashboardInstance.sendCruiseCommand(action);
-            }
+            if (dashboardInstance) dashboardInstance.sendCruiseCommand(action);
         }
         function switchToExternal() {
-            if (dashboardInstance) {
-                dashboardInstance.sendModeCommand('EXTERNAL');
-            }
+            if (dashboardInstance) dashboardInstance.sendModeCommand('EXTERNAL');
         }
 
         class VehicleDashboard {
@@ -597,61 +286,35 @@
                 this.topicData = {};
                 this.currentVehicleState = null;
                 this.canSwitchToExternal = false;
-                
-                // Cruise control state variables
                 this.ccActive = false;
                 this.targetSpeed = 0;
                 this.currentSpeed = 0;
-
                 this.connect();
             }
 
             connect() {
                 try {
-                    let wsUrl = DASHBOARD_CONFIG.ws_url;
-                    if (!wsUrl) {
-                        const hostname = window.location.hostname || 'localhost';
-                        wsUrl = `ws://${hostname}:8765`;
-                    }
-                    
-                    console.log(`Attempting to connect to: ${wsUrl}`);
+                    let wsUrl = DASHBOARD_CONFIG.ws_url || `ws://${window.location.hostname || 'localhost'}:8765`;
                     this.ws = new WebSocket(wsUrl);
 
-                    this.ws.onopen = () => {
-                        console.log('Connected to vehicle data stream');
-                        this.setStatus(true);
-                        this.hideError();
-                    };
-
+                    this.ws.onopen = () => { this.setStatus(true); this.hideError(); };
                     this.ws.onmessage = (event) => {
-                        try {
-                            const message = JSON.parse(event.data);
-                            this.handleMessage(message);
-                        } catch (err) {
-                            console.error('Failed to parse message:', err);
-                        }
+                        try { this.handleMessage(JSON.parse(event.data)); } 
+                        catch (err) { console.error('Parse error:', err); }
                     };
-
-                    this.ws.onerror = (error) => {
-                        this.setStatus(false);
-                        this.showError();
-                    };
-
+                    this.ws.onerror = () => { this.setStatus(false); this.showError(); };
                     this.ws.onclose = () => {
-                        this.setStatus(false);
-                        this.showError();
+                        this.setStatus(false); this.showError();
                         setTimeout(() => this.connect(), 3000);
                     };
                 } catch (err) {
-                    this.setStatus(false);
-                    this.showError();
+                    this.setStatus(false); this.showError();
                     setTimeout(() => this.connect(), 3000);
                 }
             }
 
             handleMessage(message) {
                 const { event, payload } = message;
-
                 if (event === 'snapshot' || event === 'batch_update') {
                     if (payload.topics) {
                         Object.values(payload.topics).forEach(topic => this.updateTopic(topic));
@@ -666,12 +329,12 @@
 
                 this.topicData[name] = { 
                     type, data,
-                    timestamp: new Date().toISOString(),
-                    received_stamp: topic.received_stamp,
-                    header_stamp: topic.header_stamp
+                    timestamp: new Date().toLocaleTimeString()
                 };
 
-                this.updateRawDataView();
+                if (currentPage === 'raw') {
+                    this.updateRawDataView();
+                }
 
                 if (type.includes('JoystickCommand')) {
                     this.updateJoystickCommand(data);
@@ -679,13 +342,10 @@
                     this.updateVehicleState(data);
                 }
 
-                // Snelheid detecteren (aanname dat het in een van de topics 'speed' of 'velocity' heet)
-                if (data) {
-                    if (data.speed !== undefined) {
-                        this.updateCurrentSpeed(data.speed);
-                    } else if (data.velocity !== undefined) {
-                        this.updateCurrentSpeed(data.velocity);
-                    }
+                if (data && data.speed !== undefined) {
+                    this.updateCurrentSpeed(data.speed);
+                } else if (data && data.velocity !== undefined) {
+                    this.updateCurrentSpeed(data.velocity);
                 }
             }
 
@@ -695,21 +355,16 @@
                 if (speedElement) speedElement.textContent = this.currentSpeed;
             }
 
-            // --- Nieuwe Cruise Control Logica ---
             sendCruiseCommand(action) {
-                // Lokale status aanpassen
                 if (action === 'SET') {
                     this.ccActive = true;
-                    // Stel doelsnelheid in op huidige snelheid
                     this.targetSpeed = this.currentSpeed; 
-                    
                     document.getElementById('uiCcStatus').textContent = 'ACTIVE';
                     document.getElementById('uiCcStatus').className = 'cc-status-indicator active';
                 } else if (action === 'UP' && this.ccActive) {
                     this.targetSpeed += 1;
                 } else if (action === 'DOWN' && this.ccActive) {
-                    this.targetSpeed -= 1;
-                    if (this.targetSpeed < 0) this.targetSpeed = 0;
+                    this.targetSpeed = Math.max(0, this.targetSpeed - 1);
                 } else if (action === 'CANCEL') {
                     this.ccActive = false;
                     this.targetSpeed = 0;
@@ -717,64 +372,64 @@
                     document.getElementById('uiCcStatus').className = 'cc-status-indicator';
                 }
 
-                // UI Update
                 document.getElementById('uiTargetSpeed').textContent = this.targetSpeed;
 
-                // Bericht versturen naar de backend
                 if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                    const command = {
-                        event: 'cruise_command',
-                        payload: {
-                            action: action,
-                            target_speed: this.targetSpeed
-                        }
-                    };
-                    console.log('Sending Cruise Control command:', command);
-                    this.ws.send(JSON.stringify(command));
-                } else {
-                    console.error('WebSocket not connected, cannot send cruise command');
+                    this.ws.send(JSON.stringify({ event: 'cruise_command', payload: { action, target_speed: this.targetSpeed }}));
                 }
             }
 
-            updateRawDataView() {
-                const container = document.getElementById('rawDataContainer');
-                if (!container) return;
-
-                if (Object.keys(this.topicData).length === 0) {
-                    container.innerHTML = '<div class="no-data">No data received yet...</div>';
-                    return;
+            // Nieuwe functie: Handmatige override UI activeren (Voor direct voelbare responsiviteit)
+            forceManualModeUI() {
+                if (this.currentVehicleState !== 'MANUAL') {
+                    this.currentVehicleState = 'MANUAL';
+                    const stateElement = document.getElementById('vehicleStateValue');
+                    if (stateElement) {
+                        stateElement.textContent = 'MANUAL';
+                        stateElement.classList.remove('state-EXTERNAL', 'state-EHB_ERROR', 'state-IMMOBILIZED');
+                        stateElement.classList.add('state-MANUAL');
+                    }
                 }
 
-                let html = '';
-                const sortedTopics = Object.entries(this.topicData).sort((a, b) => a[0].localeCompare(b[0]));
-
-                for (const [topicName, topicInfo] of sortedTopics) {
-                    html += `
-                        <div class="topic-card">
-                            <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid rgba(100,150,255,0.2); padding-bottom:8px;">
-                                <div>
-                                    <div style="color:#4287f5; font-weight:600; font-size:14px;">${topicName}</div>
-                                    <div style="color:#8b5cf6; font-size:11px;">${topicInfo.type}</div>
-                                </div>
-                                <div style="text-align:right; font-size:10px; color:#a0a0b0;">
-                                    <div>${topicInfo.timestamp}</div>
-                                </div>
-                            </div>
-                            <div class="topic-data">${JSON.stringify(topicInfo.data, null, 2)}</div>
-                        </div>`;
+                if (this.ccActive) {
+                    this.ccActive = false;
+                    this.targetSpeed = 0;
+                    const ccStatus = document.getElementById('uiCcStatus');
+                    if (ccStatus) {
+                        ccStatus.textContent = 'OFF';
+                        ccStatus.className = 'cc-status-indicator';
+                    }
+                    const uiTargetSpeed = document.getElementById('uiTargetSpeed');
+                    if (uiTargetSpeed) uiTargetSpeed.textContent = '0';
                 }
-                container.innerHTML = html;
+
+                const button = document.getElementById('switchToExternalBtn');
+                if (button && this.canSwitchToExternal) {
+                    button.classList.remove('hidden');
+                }
             }
 
             updateJoystickCommand(data) {
                 if ('throttle' in data) {
                     const throttle = Math.max(0, Math.min(100, data.throttle * 100));
                     this.updateGauge('throttleArc', 'throttleValue', throttle);
+                    
+                    // Fallback: Als we gas geven (>2%), springt de UI meteen naar MANUAL
+                    if (throttle > 2 && this.currentVehicleState === 'EXTERNAL') {
+                        this.forceManualModeUI();
+                    }
                 }
+                
                 if ('brake' in data) {
                     const brake = Math.max(0, Math.min(100, data.brake * 100));
                     this.updateGauge('brakeArc', 'brakeValue', brake);
+                    
+                    // Fallback: Als we remmen (>2%), springt de UI meteen naar MANUAL
+                    if (brake > 2 && this.currentVehicleState === 'EXTERNAL') {
+                        this.forceManualModeUI();
+                    }
                 }
+                
                 if ('gear' in data) {
                     const gearMap = { '-1': 'R', '0': 'N', '1': 'D' };
                     const gearElement = document.getElementById('gearDisplay');
@@ -786,12 +441,21 @@
                 if ('state' in data) {
                     this.currentVehicleState = data.state;
                     const stateElement = document.getElementById('vehicleStateValue');
+                    
                     if (stateElement) {
                         stateElement.textContent = data.state;
+                        
+                        // Teruggezet naar de veilige originele manier via classList
                         stateElement.classList.remove('state-EXTERNAL', 'state-MANUAL', 'state-EHB_ERROR', 'state-IMMOBILIZED');
                         stateElement.classList.add(`state-${data.state}`);
                     }
+
+                    // Zorg dat de Cruise Control UI uitgaat als backend MANUAL meldt
+                    if (data.state === 'MANUAL' && this.ccActive) {
+                        this.forceManualModeUI();
+                    }
                 }
+
                 if ('can_switch_to_external' in data) {
                     this.canSwitchToExternal = data.can_switch_to_external;
                     const button = document.getElementById('switchToExternalBtn');
@@ -805,16 +469,39 @@
                 }
             }
 
+            updateRawDataView() {
+                const container = document.getElementById('rawDataContainer');
+                if (!container) return;
+
+                if (Object.keys(this.topicData).length === 0) {
+                    container.innerHTML = '<div class="no-data" style="font-size: 14px; color: #a0a0b0;">No data received yet...</div>';
+                    return;
+                }
+
+                let html = '';
+                const sortedTopics = Object.entries(this.topicData).sort((a, b) => a[0].localeCompare(b[0]));
+
+                for (const [topicName, topicInfo] of sortedTopics) {
+                    html += `
+                        <div class="topic-card">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:6px; border-bottom:1px solid rgba(100,150,255,0.2); padding-bottom:6px;">
+                                <div>
+                                    <div style="color:#4287f5; font-weight:600; font-size:13px;">${topicName}</div>
+                                    <div style="color:#8b5cf6; font-size:10px;">${topicInfo.type}</div>
+                                </div>
+                                <div style="text-align:right; font-size:10px; color:#a0a0b0;">
+                                    <div>${topicInfo.timestamp}</div>
+                                </div>
+                            </div>
+                            <div class="topic-data">${JSON.stringify(topicInfo.data, null, 2)}</div>
+                        </div>`;
+                }
+                container.innerHTML = html;
+            }
+
             sendModeCommand(targetState) {
                 if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-                
-                const command = {
-                    event: 'mode_command',
-                    payload: { target_state: targetState }
-                };
-                
-                this.ws.send(JSON.stringify(command));
-                
+                this.ws.send(JSON.stringify({ event: 'mode_command', payload: { target_state: targetState } }));
                 const button = document.getElementById('switchToExternalBtn');
                 if (button) {
                     button.disabled = true;
@@ -823,23 +510,15 @@
             }
 
             updateGauge(arcId, valueId, percentage) {
-                const offset = 502.65 * (1 - percentage / 100);
                 const arc = document.getElementById(arcId);
-                if (arc) arc.style.strokeDashoffset = offset;
                 const value = document.getElementById(valueId);
+                if (arc) arc.style.strokeDashoffset = 502.65 * (1 - percentage / 100);
                 if (value) value.textContent = Math.round(percentage);
             }
 
             setStatus(connected) {
-                const statusDot = document.getElementById('statusDot');
-                const statusText = document.getElementById('statusText');
-                if (connected) {
-                    statusDot.classList.remove('disconnected');
-                    statusText.textContent = 'Connected';
-                } else {
-                    statusDot.classList.add('disconnected');
-                    statusText.textContent = 'Disconnected';
-                }
+                document.getElementById('statusDot').className = `status-dot ${connected ? '' : 'disconnected'}`;
+                document.getElementById('statusText').textContent = connected ? 'Connected' : 'Disconnected';
             }
 
             showError() { document.getElementById('connectionError').classList.add('show'); }
@@ -848,6 +527,7 @@
 
         window.addEventListener('load', () => {
             dashboardInstance = new VehicleDashboard();
+            dashboardInstance.updateRawDataView(); 
         });
     </script>
 </body>
